@@ -202,6 +202,81 @@ class Muon(torch.optim.Optimizer):
                 all_reduce_futures.append(dist.all_gather(params_pad[base_i:base_i + world_size], params_pad[base_i + rank], async_op=True).get_future())
         torch.futures.collect_all(all_reduce_futures).wait()
 
+class LookaheadWrapper(torch.optim.Optimizer):
+    """
+    Optimized DiLoCo/Lookahead optimizer wrapper that can wrap any existing optimizer.
+    Implements the single-worker DiLoCo case with fast/slow parameters and long-term momentum.
+    """
+    def __init__(self, base_optimizer, lookahead_steps=5, outer_lr=0.7, outer_momentum=0.9):
+        self.base_optimizer = base_optimizer
+        self.lookahead_steps = lookahead_steps
+        self.outer_lr = outer_lr
+        self.outer_momentum = outer_momentum
+        self.step_count = 0
+
+        self.param_list = []
+        self.slow_params = []
+        self.outer_velocity = []
+
+        for group in self.base_optimizer.param_groups:
+            for param in group['params']:
+                if param.requires_grad:
+                    self.param_list.append(param)
+                    self.slow_params.append(param.data.clone())
+                    self.outer_velocity.append(torch.zeros_like(param.data))
+
+        # Inherit param_groups from base optimizer for compatibility
+        self.param_groups = self.base_optimizer.param_groups
+        self.defaults = self.base_optimizer.defaults
+        self.state = self.base_optimizer.state
+
+    @torch.no_grad()
+    def step(self, closure=None):
+        # Step the base optimizer (fast parameters)
+        loss = self.base_optimizer.step(closure)
+        self.step_count += 1
+
+        # Every H steps, perform lookahead update
+        if self.step_count % self.lookahead_steps == 0:
+            self._lookahead_step()
+
+        return loss
+
+    @torch.no_grad()
+    def _lookahead_step(self):
+        """Perform the optimized lookahead update with Nesterov momentum"""
+        # Process all parameters in a single loop with indexed access
+        for i, param in enumerate(self.param_list):
+            # Compute outer gradient (parameter difference over H steps)
+            outer_grad = self.slow_params[i] - param.data
+            self.outer_velocity[i].mul_(self.outer_momentum).add_(outer_grad)
+
+            # Nesterov update to slow parameters in-place
+            self.slow_params[i].add_(
+                self.outer_momentum * self.outer_velocity[i] + outer_grad,
+                alpha=-self.outer_lr
+            )
+
+            # Reset fast parameters to slow parameters
+            param.data.copy_(self.slow_params[i])
+
+    def zero_grad(self, set_to_none=False):
+        self.base_optimizer.zero_grad(set_to_none)
+
+    def state_dict(self):
+        return {
+            'base_optimizer': self.base_optimizer.state_dict(),
+            'step_count': self.step_count,
+            'slow_params': [slow_param.clone() for slow_param in self.slow_params],
+            'outer_velocity': [velocity.clone() for velocity in self.outer_velocity],
+        }
+
+    def load_state_dict(self, state_dict):
+        self.base_optimizer.load_state_dict(state_dict['base_optimizer'])
+        self.step_count = state_dict['step_count']
+        self.slow_params = state_dict['slow_params']
+        self.outer_velocity = state_dict['outer_velocity']
+
 class DistAdam(torch.optim.Optimizer):
     def __init__(self, params, lr: float = 1e-3, betas: tuple[float, float] = (0.9, 0.999), eps: float = 1e-8, weight_decay: float = 0.01):
         defaults = dict(lr=lr, betas=betas, eps=eps, weight_decay=weight_decay)
@@ -563,6 +638,11 @@ class Hyperparameters:
     # optimization
     num_iterations = 1750 # number of iterations to run
     cooldown_frac = 0.45 # fraction of training spent cooling down the learning rate
+    # lookahead optimizer
+    use_lookahead = True # enable DiLoCo/Lookahead optimizer
+    lookahead_steps = 5 # how many inner steps before outer update
+    outer_lr = 0.7 # outer learning rate for lookahead
+    outer_momentum = 0.9 # outer momentum for lookahead
     # evaluation and logging
     val_loss_every = 125 # every how many steps to evaluate val loss? 0 for only at the end
     save_checkpoint = False
@@ -622,7 +702,15 @@ head_params = [model.lm_head.weight]
 # small adam epsilon by @YouJiacheng. this is an alternate method of fixing the world_size dependence
 # discovered by @fernbear.bsky.social https://x.com/hi_tysam/status/1879692937589875094
 optimizer1 = DistAdam(scalar_params + head_params + embed_params, lr=0.008, betas=(0.8, 0.95), eps=1e-10, weight_decay=0.0)
-optimizer2 = Muon(hidden_matrix_params, lr=0.05, momentum=0.95, weight_decay=0.0)
+base_optimizer2 = Muon(hidden_matrix_params, lr=0.05, momentum=0.95, weight_decay=0.0)
+
+# wrap Muon with lookahead if enabled
+if args.use_lookahead:
+    LookaheadMuon = partial(LookaheadWrapper, lookahead_steps=args.lookahead_steps, outer_lr=args.outer_lr, outer_momentum=args.outer_momentum)
+    optimizer2 = LookaheadMuon(base_optimizer2)
+else:
+    optimizer2 = base_optimizer2
+
 optimizers = [optimizer1, optimizer2]
 for opt in optimizers:
     for group in opt.param_groups:
