@@ -669,14 +669,18 @@ dist.init_process_group(backend="nccl", device_id=device)
 dist.barrier()
 master_process = (rank == 0) # this process will do logging, checkpointing etc.
 
-config_dict = {}
-config_container = []
+# wandb init and hyperparameter synchronization
+config_container = [None]
 if master_process:
     wandb.init(project="modded-nanogpt")
-    config_container = [wandb.config]
+    # Filter wandb.config to only include keys that are fields in the Hyperparameters dataclass
+    config_dict = {k: v for k, v in wandb.config.items() if k in Hyperparameters.__annotations__}
+    config_container[0] = config_dict
 
 dist.broadcast_object_list(config_container, src=0)
-args = Hyperparameters(**config_container.pop())
+dist.barrier()
+
+args = Hyperparameters(**config_container[0])
 
 # begin logging
 logfile = None
