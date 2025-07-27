@@ -16,4 +16,4 @@ command:
   - ${env}
   - sh
   - -c
-  - "sudo -E docker run --rm --gpus all -e WANDB_API_KEY -e WANDB_SWEEP_ID -e WANDB_RUN_ID -e WANDB_PROJECT -e WANDB_ENTITY -v $(pwd):/modded-nanogpt -v ~/.cache/torch_compile_cache:/root/.cache/torch/compile modded-nanogpt torchrun --standalone --nproc_per_node=8 train_gpt.py"
+  - "sudo -E docker run --gpus all -e WANDB_API_KEY -e WANDB_SWEEP_ID -e WANDB_RUN_ID -e WANDB_PROJECT -e WANDB_ENTITY -v $(pwd):/modded-nanogpt modded-nanogpt torchrun --standalone --nproc_per_node=8 train_gpt.py"
