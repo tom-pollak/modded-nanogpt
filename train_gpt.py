@@ -813,9 +813,32 @@ for step in range(train_steps + 1):
     for opt in optimizers:
         for group in opt.param_groups:
             group["lr"] = group["initial_lr"] * get_lr(step)
+    # Debug: check param_groups before momentum warmup
+    if step <= 5:
+        print(f"[DEBUG] Step {step}: optimizer2 type = {type(optimizer2).__name__}")
+        print(f"[DEBUG] Step {step}: optimizer2.param_groups is base_optimizer2.param_groups = {optimizer2.param_groups is base_optimizer2.param_groups}")
+        print(f"[DEBUG] Step {step}: len(optimizer2.param_groups) = {len(optimizer2.param_groups)}")
+        for i, group in enumerate(optimizer2.param_groups):
+            print(f"[DEBUG] Step {step}: group[{i}] momentum before = {group.get('momentum', 'NOT_SET')}")
+    
     for group in optimizer2.param_groups:
         frac = min(step / 300, 1) # momentum warmup for muon
-        group["momentum"] = (1 - frac) * 0.85 + frac * 0.95
+        old_momentum = group["momentum"]
+        new_momentum = (1 - frac) * 0.85 + frac * 0.95
+        group["momentum"] = new_momentum
+        
+        # Debug: check if momentum actually changed
+        if step <= 5:
+            print(f"[DEBUG] Step {step}: momentum changed from {old_momentum} to {new_momentum}")
+    
+    # Debug: verify the change actually took effect
+    if step <= 5:
+        for i, group in enumerate(optimizer2.param_groups):
+            print(f"[DEBUG] Step {step}: group[{i}] momentum after = {group['momentum']}")
+        # Also check base optimizer to see if changes are shared
+        if hasattr(base_optimizer2, 'param_groups'):
+            for i, group in enumerate(base_optimizer2.param_groups):
+                print(f"[DEBUG] Step {step}: base_optimizer2 group[{i}] momentum = {group['momentum']}")
     # step the optimizers
     for opt in optimizers:
         opt.step()
