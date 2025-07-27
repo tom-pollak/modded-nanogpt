@@ -9,7 +9,7 @@ parameters:
   outer_lr:
     values: [0.3, 0.5, 0.7, 0.9]
   outer_momentum:
-    value: [0.8, 0.85, 0.9, 0.95]
+    values: [0.8, 0.85, 0.9, 0.95]
   apply_lookahead:
     values: ["optimizer1", "optimizer2", "both"]
 command:
@@ -22,8 +22,7 @@ command:
   - --gpus
   - all
   - -v
-  - $(pwd):/modded-nanogpt
+  - /home/ubuntu/nethome-us-west-3/tomp/modded-nanogpt:/modded-nanogpt
   - modded-nanogpt
   - sh
-  - -c
-  - "torchrun --standalone --nproc_per_node=8 wandb agent ${run}"
+  - run.sh
