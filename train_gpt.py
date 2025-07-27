@@ -233,7 +233,7 @@ class LookaheadWrapper(torch.optim.Optimizer):
     @torch.no_grad()
     def step(self, closure=None):
         # Step the base optimizer (fast parameters)
-        loss = self.base_optimizer.step(closure)
+        loss = self.base_optimizer.step()
         self.step_count += 1
 
         # Every H steps, perform lookahead update
