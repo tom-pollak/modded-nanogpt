@@ -671,7 +671,7 @@ master_process = (rank == 0) # this process will do logging, checkpointing etc.
 
 config_container = [None]
 if master_process:
-    wandb.init(project="modded-nanogpt", group=os.environ["WANDB_SWEEP_ID"])
+    wandb.init(project="modded-nanogpt")
     config_container[0] = dict(wandb.config)
 
 dist.broadcast_object_list(config_container, src=0)
