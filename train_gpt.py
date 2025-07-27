@@ -649,7 +649,7 @@ class Hyperparameters:
     cooldown_frac = 0.45 # fraction of training spent cooling down the learning rate
     # lookahead optimizer
     use_lookahead = True # enable DiLoCo/Lookahead optimizer
-    lookahead_steps = 100 # how many inner steps before outer update
+    lookahead_steps = 10 # how many inner steps before outer update
     outer_lr = 0.7 # outer learning rate for lookahead
     outer_momentum = 0.9 # outer momentum for lookahead
     # evaluation and logging

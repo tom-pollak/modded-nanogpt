@@ -6,4 +6,7 @@ step:1750/1750 val_loss:3.2788 train_time:177621ms step_avg:101.50ms
 lookahead_steps = 2000
 step:1750/1750 val_loss:3.2812 train_time:177201ms step_avg:101.26ms
 
+lookahead_steps = 100
+step:1750/1750 val_loss:3.3126 train_time:177151ms step_avg:101.23ms
+
 
