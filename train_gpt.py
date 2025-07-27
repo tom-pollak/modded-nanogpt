@@ -232,6 +232,9 @@ class LookaheadWrapper(torch.optim.Optimizer):
 
     @torch.no_grad()
     def step(self, closure=None):
+        # Validate param_groups are still shared (debug assertion)
+        assert self.param_groups is self.base_optimizer.param_groups, "param_groups reference broken!"
+
         # Step the base optimizer (fast parameters)
         loss = self.base_optimizer.step()
         self.step_count += 1
@@ -276,6 +279,13 @@ class LookaheadWrapper(torch.optim.Optimizer):
         self.step_count = state_dict['step_count']
         self.slow_params = state_dict['slow_params']
         self.outer_velocity = state_dict['outer_velocity']
+
+        # CRITICAL FIX: Re-establish shared references after state loading
+        # The base optimizer's load_state_dict() creates new param_groups objects,
+        # so we need to update our references to maintain sharing
+        self.param_groups = self.base_optimizer.param_groups
+        self.defaults = self.base_optimizer.defaults
+        self.state = self.base_optimizer.state
 
 class DistAdam(torch.optim.Optimizer):
     def __init__(self, params, lr: float = 1e-3, betas: tuple[float, float] = (0.9, 0.999), eps: float = 1e-8, weight_decay: float = 0.01):
@@ -813,32 +823,9 @@ for step in range(train_steps + 1):
     for opt in optimizers:
         for group in opt.param_groups:
             group["lr"] = group["initial_lr"] * get_lr(step)
-    # Debug: check param_groups before momentum warmup
-    if step <= 5:
-        print(f"[DEBUG] Step {step}: optimizer2 type = {type(optimizer2).__name__}")
-        print(f"[DEBUG] Step {step}: optimizer2.param_groups is base_optimizer2.param_groups = {optimizer2.param_groups is base_optimizer2.param_groups}")
-        print(f"[DEBUG] Step {step}: len(optimizer2.param_groups) = {len(optimizer2.param_groups)}")
-        for i, group in enumerate(optimizer2.param_groups):
-            print(f"[DEBUG] Step {step}: group[{i}] momentum before = {group.get('momentum', 'NOT_SET')}")
-    
     for group in optimizer2.param_groups:
         frac = min(step / 300, 1) # momentum warmup for muon
-        old_momentum = group["momentum"]
-        new_momentum = (1 - frac) * 0.85 + frac * 0.95
-        group["momentum"] = new_momentum
-        
-        # Debug: check if momentum actually changed
-        if step <= 5:
-            print(f"[DEBUG] Step {step}: momentum changed from {old_momentum} to {new_momentum}")
-    
-    # Debug: verify the change actually took effect
-    if step <= 5:
-        for i, group in enumerate(optimizer2.param_groups):
-            print(f"[DEBUG] Step {step}: group[{i}] momentum after = {group['momentum']}")
-        # Also check base optimizer to see if changes are shared
-        if hasattr(base_optimizer2, 'param_groups'):
-            for i, group in enumerate(base_optimizer2.param_groups):
-                print(f"[DEBUG] Step {step}: base_optimizer2 group[{i}] momentum = {group['momentum']}")
+        group["momentum"] = (1 - frac) * 0.85 + frac * 0.95
     # step the optimizers
     for opt in optimizers:
         opt.step()
