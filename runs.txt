@@ -3,10 +3,19 @@
 original:
 step:1750/1750 val_loss:3.2788 train_time:177621ms step_avg:101.50ms
 
-lookahead_steps = 2000
-step:1750/1750 val_loss:3.2812 train_time:177201ms step_avg:101.26ms
+===
+
+lookahead_steps = 10
+step:1750/1750 val_loss:3.3379 train_time:177807ms step_avg:101.60ms
 
 lookahead_steps = 100
 step:1750/1750 val_loss:3.3126 train_time:177151ms step_avg:101.23ms
 
+lookahead_steps = 500
+step:1750/1750 val_loss:3.2898 train_time:177160ms step_avg:101.23ms
 
+lookahead_steps = 1000
+step:1750/1750 val_loss:3.2831 train_time:176935ms step_avg:101.11ms
+
+lookahead_steps = 2000 (should be equiv to baseline, only 1750 steps in total)
+step:1750/1750 val_loss:3.2812 train_time:177201ms step_avg:101.26ms

@@ -6,6 +6,7 @@ import uuid
 import time
 import copy
 import glob
+import wandb
 from dataclasses import dataclass
 from functools import lru_cache, partial # Added partial for hook registration
 from pathlib import Path
@@ -648,7 +649,7 @@ class Hyperparameters:
     num_iterations = 1750 # number of iterations to run
     cooldown_frac = 0.45 # fraction of training spent cooling down the learning rate
     # lookahead optimizer
-    use_lookahead = True # enable DiLoCo/Lookahead optimizer
+    apply_lookahead = "none" # "optimizer1", "optimizer2", "both", "none"
     lookahead_steps = 10 # how many inner steps before outer update
     outer_lr = 0.7 # outer learning rate for lookahead
     outer_momentum = 0.9 # outer momentum for lookahead
@@ -667,6 +668,15 @@ torch.cuda.set_device(device)
 dist.init_process_group(backend="nccl", device_id=device)
 dist.barrier()
 master_process = (rank == 0) # this process will do logging, checkpointing etc.
+
+config_dict = {}
+config_container = []
+if master_process:
+    wandb.init(project="modded-nanogpt")
+    config_container = [wandb.config]
+
+dist.broadcast_object_list(config_container, src=0)
+args = Hyperparameters(**config_container.pop())
 
 # begin logging
 logfile = None
@@ -711,14 +721,19 @@ head_params = [model.lm_head.weight]
 # small adam epsilon by @YouJiacheng. this is an alternate method of fixing the world_size dependence
 # discovered by @fernbear.bsky.social https://x.com/hi_tysam/status/1879692937589875094
 optimizer1 = DistAdam(scalar_params + head_params + embed_params, lr=0.008, betas=(0.8, 0.95), eps=1e-10, weight_decay=0.0)
-base_optimizer2 = Muon(hidden_matrix_params, lr=0.05, momentum=0.95, weight_decay=0.0)
+optimizer2 = Muon(hidden_matrix_params, lr=0.05, momentum=0.95, weight_decay=0.0)
 
-# wrap Muon with lookahead if enabled
-if args.use_lookahead:
-    LookaheadMuon = partial(LookaheadWrapper, lookahead_steps=args.lookahead_steps, outer_lr=args.outer_lr, outer_momentum=args.outer_momentum)
-    optimizer2 = LookaheadMuon(base_optimizer2)
-else:
-    optimizer2 = base_optimizer2
+# wrap with lookahead if enabled
+if args.apply_lookahead != "none":
+    lookahead_kwargs = {
+        "lookahead_steps": args.lookahead_steps,
+        "outer_lr": args.outer_lr,
+        "outer_momentum": args.outer_momentum
+    }
+    if args.apply_lookahead == "optimizer1" or args.apply_lookahead == "both":
+        optimizer1 = LookaheadWrapper(optimizer1, **lookahead_kwargs)
+    if args.apply_lookahead == "optimizer2" or args.apply_lookahead == "both":
+        optimizer2 = LookaheadWrapper(optimizer2, **lookahead_kwargs)
 
 optimizers = [optimizer1, optimizer2]
 for opt in optimizers:
@@ -802,6 +817,8 @@ for step in range(train_steps + 1):
         del val_loader
         dist.all_reduce(val_loss, op=dist.ReduceOp.AVG)
         print0(f"step:{step}/{train_steps} val_loss:{val_loss:.4f} train_time:{training_time_ms:.0f}ms step_avg:{training_time_ms/max(step, 1):.2f}ms", console=True)
+        if master_process:
+            wandb.log({"val_loss": val_loss.item(), "step": step, "train_time_ms": training_time_ms})
         model.train()
         # start the clock again
         torch.cuda.synchronize()
@@ -837,3 +854,5 @@ for step in range(train_steps + 1):
 print0(f"peak memory allocated: {torch.cuda.max_memory_allocated() // 1024 // 1024} MiB "
        f"reserved: {torch.cuda.max_memory_reserved() // 1024 // 1024} MiB", console=True)
 dist.destroy_process_group()
+if master_process:
+    wandb.finish()
