@@ -232,7 +232,6 @@ class LookaheadWrapper(torch.optim.Optimizer):
 
     @torch.no_grad()
     def step(self, closure=None):
-        # Validate param_groups are still shared (debug assertion)
         assert self.param_groups is self.base_optimizer.param_groups, "param_groups reference broken!"
 
         # Step the base optimizer (fast parameters)
@@ -280,7 +279,7 @@ class LookaheadWrapper(torch.optim.Optimizer):
         self.slow_params = state_dict['slow_params']
         self.outer_velocity = state_dict['outer_velocity']
 
-        # CRITICAL FIX: Re-establish shared references after state loading
+        # Re-establish shared references after state loading
         # The base optimizer's load_state_dict() creates new param_groups objects,
         # so we need to update our references to maintain sharing
         self.param_groups = self.base_optimizer.param_groups
