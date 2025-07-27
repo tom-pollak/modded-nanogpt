@@ -14,15 +14,6 @@ parameters:
     values: ["optimizer1", "optimizer2", "both"]
 command:
   - ${env}
-  - sudo
-  - docker
-  - run
-  - -it
-  - --rm
-  - --gpus
-  - all
-  - -v
-  - /home/ubuntu/nethome-us-west-3/tomp/modded-nanogpt:/modded-nanogpt
-  - modded-nanogpt
   - sh
-  - run.sh
+  - -c
+  - "sudo docker run --rm --gpus all -v $(pwd):/modded-nanogpt modded-nanogpt sh run.sh"
