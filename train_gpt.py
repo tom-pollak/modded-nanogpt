@@ -676,8 +676,19 @@ if master_process:
 
 dist.broadcast_object_list(config_container, src=0)
 dist.barrier()
+wandb_config = config_container.pop()
 
-args = Hyperparameters(**config_container[0])
+if master_process:
+    print(f"{' WANDB CONFIG ':=^30}")
+    print(wandb_config)
+    print("=" * 30)
+
+args = Hyperparameters(**wandb_config)
+
+if master_process:
+    print(f"{' ARGS ':=^30}")
+    print(args)
+    print("=" * 30)
 
 # begin logging
 logfile = None
