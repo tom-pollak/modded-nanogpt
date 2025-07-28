@@ -682,6 +682,7 @@ if master_process:
     print(f"{' WANDB CONFIG ':=^30}")
     print(wandb_config)
     print("=" * 30)
+    print()
 
 args = Hyperparameters(**wandb_config)
 
