@@ -649,10 +649,10 @@ class Hyperparameters:
     num_iterations = 1750 # number of iterations to run
     cooldown_frac = 0.45 # fraction of training spent cooling down the learning rate
     # lookahead optimizer
-    apply_lookahead = "none" # "optimizer1", "optimizer2", "both", "none"
-    lookahead_steps = 10 # how many inner steps before outer update
-    outer_lr = 0.7 # outer learning rate for lookahead
-    outer_momentum = 0.9 # outer momentum for lookahead
+    apply_lookahead = "both" # "optimizer1", "optimizer2", "both", "none"
+    lookahead_steps = 250 # how many inner steps before outer update
+    outer_lr = 0.5 # outer learning rate for lookahead
+    outer_momentum = 0.95 # outer momentum for lookahead
     # evaluation and logging
     val_loss_every = 125 # every how many steps to evaluate val loss? 0 for only at the end
     save_checkpoint = False
