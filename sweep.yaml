@@ -7,7 +7,7 @@ parameters:
   lookahead_steps:
     values: [50, 100, 250]
   outer_lr:
-    values: [0.3, 0.5, 0.7, 0.9]
+    values: [0.1, 0.3, 0.5, 0.7]
   outer_momentum:
     values: [0.85, 0.9, 0.95]
   apply_lookahead:
@@ -16,4 +16,4 @@ command:
   - ${env}
   - sh
   - -c
-  - "sudo -E docker run --gpus all -e WANDB_API_KEY -e WANDB_SWEEP_ID -e WANDB_RUN_ID -e WANDB_PROJECT -e WANDB_ENTITY -v $(pwd):/modded-nanogpt modded-nanogpt torchrun --standalone --nproc_per_node=8 train_gpt.py"
+  - "torchrun --standalone --nproc_per_node=8 train_gpt.py"

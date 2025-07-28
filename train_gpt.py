@@ -602,7 +602,7 @@ def find_batch_starts(tokens: Tensor, pos: int, local_batch_size: int, max_batch
     start = boundary_positions[0].item()
     starts = []
     for i in range(1, len(boundary_positions)):
-        end = boundary_positions[i].item() 
+        end = boundary_positions[i].item()
         if end - start >= local_batch_size:
             starts.append(start) # append start once end pos is confirmed
             if len(starts) == dist.get_world_size():
@@ -640,22 +640,22 @@ def distributed_data_generator(filename_pattern: str, batch_size: int, align_to_
 @dataclass
 class Hyperparameters:
     # data
-    train_files = "data/fineweb10B/fineweb_train_*.bin" # input .bin to train on
-    val_files = "data/fineweb10B/fineweb_val_*.bin" # input .bin to eval validation loss on
-    val_tokens = 10485760 # how many tokens of validation data? it's important to keep this fixed for consistent comparisons
-    train_seq_len = 48*1024 # FlexAttention sequence length
-    val_seq_len = 4*64*1024 # FlexAttention sequence length for validation
+    train_files: str = "data/fineweb10B/fineweb_train_*.bin" # input .bin to train on
+    val_files: str = "data/fineweb10B/fineweb_val_*.bin" # input .bin to eval validation loss on
+    val_tokens: int = 10485760 # how many tokens of validation data? it's important to keep this fixed for consistent comparisons
+    train_seq_len: int = 48*1024 # FlexAttention sequence length
+    val_seq_len: int = 4*64*1024 # FlexAttention sequence length for validation
     # optimization
-    num_iterations = 1500 # number of iterations to run
-    cooldown_frac = 0.45 # fraction of training spent cooling down the learning rate
+    num_iterations: int = 1750 # number of iterations to run
+    cooldown_frac: float = 0.45 # fraction of training spent cooling down the learning rate
     # lookahead optimizer
-    apply_lookahead = "both" # "optimizer1", "optimizer2", "both", "none"
-    lookahead_steps = 250 # how many inner steps before outer update
-    outer_lr = 0.5 # outer learning rate for lookahead
-    outer_momentum = 0.95 # outer momentum for lookahead
+    apply_lookahead: str = "both" # "optimizer1", "optimizer2", "both", "none"
+    lookahead_steps: int = 250 # how many inner steps before outer update
+    outer_lr: float = 0.5 # outer learning rate for lookahead
+    outer_momentum: float = 0.95 # outer momentum for lookahead
     # evaluation and logging
-    val_loss_every = 125 # every how many steps to evaluate val loss? 0 for only at the end
-    save_checkpoint = False
+    val_loss_every: int = 125 # every how many steps to evaluate val loss? 0 for only at the end
+    save_checkpoint: bool = False
 args = Hyperparameters()
 
 # torchrun sets these env variables
